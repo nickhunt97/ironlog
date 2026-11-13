@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IronLog — connection diagnostic</title>
+<style>
+ body{margin:0;background:#000;color:#F2F0EC;font:15px/1.5 system-ui,-apple-system,sans-serif;padding:20px}
+ h1{font-size:20px;letter-spacing:.06em;text-transform:uppercase;margin:0 0 4px}
+ h1 b{color:#E11D2E}
+ p{color:#9A9690;font-size:13px;margin:0 0 16px}
+ label{display:block;font:500 10px ui-monospace,monospace;letter-spacing:.16em;
+   text-transform:uppercase;color:#6B6762;margin:14px 0 6px}
+ input{width:100%;box-sizing:border-box;background:#151518;border:1px solid #26262A;border-radius:8px;
+   padding:11px;color:#F2F0EC;font:400 14px ui-monospace,monospace}
+ button{width:100%;margin:18px 0;background:#E11D2E;color:#fff;border:0;border-radius:10px;padding:13px;
+   font:600 16px system-ui;letter-spacing:.05em;text-transform:uppercase}
+ .t{border:1px solid #26262A;border-radius:10px;padding:12px 14px;margin-bottom:10px;background:#0D0D0F}
+ .t h3{margin:0 0 6px;font-size:14px}
+ .ok{border-left:3px solid #3FA169} .bad{border-left:3px solid #E11D2E} .run{border-left:3px solid #D4A127}
+ .t pre{margin:6px 0 0;white-space:pre-wrap;word-break:break-all;color:#9A9690;font-size:12px}
+ .verdict{border:1px solid #D4A127;border-radius:10px;padding:14px;margin-top:16px;background:#14110A}
+ .verdict b{color:#D4A127}
+</style>
+</head>
+<body>
+<h1><b>IRON</b>LOG — diagnostic</h1>
+<p>No redeploying. Drop this one file in your repo and run it — it probes your <i>existing</i> deployment five different ways and tells us which layer is failing. Nothing is written to your sheet.</p>
+
+<label for="u">Web app /exec URL</label>
+<input id="u" placeholder="https://script.google.com/macros/s/…/exec" autocapitalize="off" autocorrect="off" spellcheck="false">
+<label for="t">API token</label>
+<input id="t" placeholder="token from setupToken()" autocapitalize="off" autocorrect="off" spellcheck="false">
+<button id="go">Run tests</button>
+<div id="out"></div>
+
+<script>
+var out = document.getElementById('out');
+function card(name){
+  var d=document.createElement('div'); d.className='t run';
+  d.innerHTML='<h3>'+name+'</h3><pre>running…</pre>'; out.appendChild(d); return d;
+}
+function done(d, ok, text){ d.className='t '+(ok?'ok':'bad'); d.querySelector('pre').textContent=text; }
+
+async function run(){
+  out.innerHTML='';
+  var url=document.getElementById('u').value.trim();
+  var tok=document.getElementById('t').value.trim();
+  if(!url){ alert('Paste the /exec URL'); return; }
+  var results={};
+
+  var env=card('0 · Environment');
+  done(env,true,'page origin: '+location.origin+'\nsecure context: '+window.isSecureContext+
+    '\nservice worker: '+(('serviceWorker' in navigator)?'supported':'no')+
+    '\nUA: '+navigator.userAgent);
+
+  // 1 — plain cross-origin GET of /exec. Needs NOTHING new on the server:
+  //     your deployed doGet already returns the IronLog page.
+  var c1=card('1 · GET /exec (does cross-origin work at all?)');
+  try{
+    var r=await fetch(url,{method:'GET'});
+    var t=await r.text();
+    results.get = r.ok && t.length>0;
+    done(c1, results.get, 'HTTP '+r.status+'  redirected:'+r.redirected+
+      '\nGot '+t.length+' chars. Looks like: '+
+      (t.indexOf('IronLog')>=0?'your IronLog page ✓':
+       t.toLowerCase().indexOf('sign in')>=0?'a Google SIGN-IN page ✗':'something else')+
+      '\n'+t.slice(0,160).replace(/\s+/g,' '));
+  }catch(e){ results.get=false; done(c1,false,'THREW: '+e.name+' — '+e.message); }
+
+  // 2 — POST text/plain, exactly what the app does today
+  var c2=card('2 · POST text/plain (what the app uses)');
+  try{
+    var r2=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({token:tok,action:'ping'})});
+    var t2=await r2.text();
+    results.post = r2.ok && t2.indexOf('pong')>=0;
+    done(c2, results.post, 'HTTP '+r2.status+'  redirected:'+r2.redirected+'\n'+t2.slice(0,240));
+  }catch(e){ results.post=false; done(c2,false,'THREW: '+e.name+' — '+e.message); }
+
+  // 3 — POST with no explicit Content-Type
+  var c3=card('3 · POST, no Content-Type header');
+  try{
+    var r3=await fetch(url,{method:'POST',body:JSON.stringify({token:tok,action:'ping'})});
+    var t3=await r3.text();
+    results.post2 = r3.ok && t3.indexOf('pong')>=0;
+    done(c3, results.post2, 'HTTP '+r3.status+'\n'+t3.slice(0,240));
+  }catch(e){ results.post2=false; done(c3,false,'THREW: '+e.name+' — '+e.message); }
+
+  // 4 — reachability, ignoring CORS entirely
+  var c4=card('4 · no-cors reachability probe');
+  try{
+    await fetch(url,{mode:'no-cors'});
+    results.reach=true;
+    done(c4,true,'Request completed (opaque by design).\nThe server IS reachable from this device.');
+  }catch(e){ results.reach=false; done(c4,false,'THREW: '+e.name+' — '+e.message); }
+
+  // 5 — can the page be framed? (fallback transport I can switch to)
+  var c5=card('5 · iframe bridge viability');
+  await new Promise(function(res){
+    var f=document.createElement('iframe');
+    f.style.cssText='width:1px;height:1px;opacity:0;position:absolute;left:-9999px';
+    var t=setTimeout(function(){ results.frame=false;
+      done(c5,false,'Did not load within 8s — framing may be blocked.'); cleanup(); res(); },8000);
+    function cleanup(){ clearTimeout(t); try{f.remove()}catch(e){} }
+    f.onload=function(){ results.frame=true;
+      done(c5,true,'The Apps Script page loads inside an iframe.\nThe postMessage fallback would work.');
+      cleanup(); res(); };
+    f.onerror=function(){ results.frame=false; done(c5,false,'iframe refused to load.'); cleanup(); res(); };
+    f.src=url; document.body.appendChild(f);
+  });
+
+  var v=document.createElement('div'); v.className='verdict'; var m;
+  if(results.post||results.post2){
+    m='<b>POST works from this device.</b> So the endpoint is fine and the problem is the URL or token saved in the app. Clear the saved connection and re-enter them.';
+  } else if(results.get){
+    m='<b>GET works, POST is blocked.</b> That is the answer — cross-origin POST is being refused for you. Send me this screenshot; I will switch the app to a transport your device accepts. No redeploy needed.';
+  } else if(results.frame){
+    m='<b>Both GET and POST are blocked, but the page frames fine.</b> I will switch the app to the iframe bridge, which avoids cross-origin requests entirely.';
+  } else if(results.reach){
+    m='<b>Server reachable, but no CORS headers came back.</b> That means Google is answering with a sign-in or error page rather than your script. Almost always: the deployment is not actually set to <i>Anyone</i>, or an older version is live. Re-deploy with Version = New version.';
+  } else {
+    m='<b>Nothing got through at all.</b> Network, VPN, private-DNS, or a content blocker is stopping the request. Try mobile data instead of wifi, and a different browser.';
+  }
+  v.innerHTML=m; out.appendChild(v);
+}
+document.getElementById('go').onclick=run;
+</script>
+</body>
+</html>
