@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="IronLog">
+<title>IronLog</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<style>
+  html,body{margin:0;padding:0;background:#000;height:100%;overflow:hidden;
+    font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#F2F0EC}
+  #frame{position:fixed;inset:0;width:100%;height:100%;border:0;background:#000;
+    padding-top:env(safe-area-inset-top,0px);box-sizing:border-box}
+  #setup{position:fixed;inset:0;display:grid;place-items:center;padding:28px;
+    padding-top:calc(28px + env(safe-area-inset-top,0px));text-align:center;overflow:auto}
+  .in{max-width:400px;width:100%}
+  h1{font:600 30px/1 system-ui;letter-spacing:.06em;text-transform:uppercase;margin:0 0 6px}
+  h1 b{color:#E11D2E}
+  p{color:#9A9690;font-size:14px;line-height:1.55;margin:0 0 18px}
+  label{display:block;text-align:left;font:500 10px/1 ui-monospace,monospace;letter-spacing:.16em;
+    text-transform:uppercase;color:#6B6762;margin:14px 0 6px}
+  input{width:100%;box-sizing:border-box;background:#151518;border:1px solid #26262A;border-radius:8px;
+    padding:11px 12px;color:#F2F0EC;font:400 15px ui-monospace,monospace}
+  input:focus{outline:2px solid #E11D2E;outline-offset:-1px}
+  button{width:100%;margin-top:18px;background:#E11D2E;color:#fff;border:0;border-radius:10px;
+    padding:13px;font:600 16px system-ui;letter-spacing:.05em;text-transform:uppercase}
+  .err{color:#E11D2E;font-size:13px;margin-top:12px;min-height:18px}
+  .muted{color:#6B6762;font-size:12px;margin-top:16px;line-height:1.5}
+  .muted a{color:#D4A127}
+  #loader{position:fixed;inset:0;z-index:10;background:#000;display:grid;place-items:center;
+    transition:opacity .45s ease}
+  #loader.gone{opacity:0;pointer-events:none}
+  #loader svg{width:min(92vw,460px);height:auto;display:block}
+  .bar{animation:barIn 8s infinite}
+  .pl{animation-duration:8s;animation-iteration-count:infinite}
+  .p1{animation-name:k1}.p2{animation-name:k2}.p3{animation-name:k3}
+  @keyframes barIn{0%,1.5%{opacity:0}5%,92%{opacity:1}98%,100%{opacity:0}}
+  @keyframes k1{0%,2.5%{transform:translateX(var(--dx));opacity:0}8.5%{transform:translateX(0);opacity:1}10%{transform:translateX(calc(var(--dx)*-0.012))}11.5%,92%{transform:translateX(0);opacity:1}98%,100%{transform:translateX(0);opacity:0}}
+  @keyframes k2{0%,7%{transform:translateX(var(--dx));opacity:0}13%{transform:translateX(0);opacity:1}14.5%{transform:translateX(calc(var(--dx)*-0.012))}16%,92%{transform:translateX(0);opacity:1}98%,100%{transform:translateX(0);opacity:0}}
+  @keyframes k3{0%,11.5%{transform:translateX(var(--dx));opacity:0}17.5%{transform:translateX(0);opacity:1}19%{transform:translateX(calc(var(--dx)*-0.012))}20.5%,92%{transform:translateX(0);opacity:1}98%,100%{transform:translateX(0);opacity:0}}
+  .cap{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;letter-spacing:3px;
+    fill:#8A857E;opacity:0;animation-duration:8s;animation-iteration-count:infinite}
+  .c1{animation-name:w1}.c2{animation-name:w2}.c3{animation-name:w3}.c4{animation-name:w4}
+  @keyframes w1{0%{opacity:0}3%,22%{opacity:.9}25%,100%{opacity:0}}
+  @keyframes w2{0%,25%{opacity:0}28%,47%{opacity:.9}50%,100%{opacity:0}}
+  @keyframes w3{0%,50%{opacity:0}53%,72%{opacity:.9}75%,100%{opacity:0}}
+  @keyframes w4{0%,75%{opacity:0}78%,97%{opacity:.9}100%{opacity:0}}
+  #slow{opacity:0;font-family:ui-monospace,monospace;font-size:12px;letter-spacing:2px;fill:#D4A127}
+  #loader.slow .cap{animation:none;opacity:0}
+  #loader.slow #slow{opacity:.9}
+  @media(prefers-reduced-motion:reduce){
+    .bar,.pl{animation:none;opacity:1;transform:none}
+    .cap{animation:none}.c1{opacity:.9}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="loader" hidden>
+  <svg viewBox="0 0 680 320" role="img" aria-label="Loading">
+    <g class="bar">
+      <rect x="190" y="153" width="300" height="14" rx="7" fill="#D8A52C"/>
+      <rect x="300" y="156" width="80" height="4" rx="2" fill="#F8DC8E"/>
+      <rect x="192" y="140" width="9" height="40" rx="4" fill="#D8A52C" stroke="#000" stroke-width="3"/>
+      <rect x="479" y="140" width="9" height="40" rx="4" fill="#D8A52C" stroke="#000" stroke-width="3"/>
+    </g>
+    <g class="pl p1" style="--dx:300px"><rect x="386" y="105" width="30" height="110" rx="10" fill="#D61C2C" stroke="#000" stroke-width="4"/><rect x="392" y="118" width="9" height="84" rx="4" fill="#F4566A"/></g>
+    <g class="pl p2" style="--dx:300px"><rect x="424" y="119" width="25" height="82" rx="9" fill="#D61C2C" stroke="#000" stroke-width="4"/><rect x="429" y="130" width="8" height="60" rx="4" fill="#F4566A"/></g>
+    <g class="pl p3" style="--dx:300px"><rect x="456" y="131" width="21" height="58" rx="8" fill="#D61C2C" stroke="#000" stroke-width="4"/><rect x="460" y="140" width="7" height="40" rx="3" fill="#F4566A"/></g>
+    <g class="pl p1" style="--dx:-300px"><rect x="264" y="105" width="30" height="110" rx="10" fill="#D61C2C" stroke="#000" stroke-width="4"/><rect x="270" y="118" width="9" height="84" rx="4" fill="#F4566A"/></g>
+    <g class="pl p2" style="--dx:-300px"><rect x="231" y="119" width="25" height="82" rx="9" fill="#D61C2C" stroke="#000" stroke-width="4"/><rect x="236" y="130" width="8" height="60" rx="4" fill="#F4566A"/></g>
+    <g class="pl p3" style="--dx:-300px"><rect x="203" y="131" width="21" height="58" rx="8" fill="#D61C2C" stroke="#000" stroke-width="4"/><rect x="207" y="140" width="7" height="40" rx="3" fill="#F4566A"/></g>
+    <text class="cap c1" x="340" y="268" text-anchor="middle">Weighing in…</text>
+    <text class="cap c2" x="340" y="268" text-anchor="middle">Stretching…</text>
+    <text class="cap c3" x="340" y="268" text-anchor="middle">Warming up…</text>
+    <text class="cap c4" x="340" y="268" text-anchor="middle">Stacking weights…</text>
+    <text id="slow" x="340" y="268" text-anchor="middle">Still loading — check your connection</text>
+  </svg>
+</div>
+<script>
+(function(){
+  var LS='ironlog:url';
+  var url=null;
+  try{ url=localStorage.getItem(LS); }catch(e){}
+  var app=document.getElementById('app'), loader=document.getElementById('loader');
+
+  function reset(){ try{localStorage.removeItem(LS);}catch(e){} location.reload(); }
+  window.IronLogReset=reset;
+
+  function launch(u){
+    app.innerHTML='';
+    loader.hidden=false; loader.classList.remove('gone','slow');
+    var f=document.createElement('iframe');
+    f.id='frame'; f.src=u; f.setAttribute('allow','clipboard-write');
+    f.setAttribute('referrerpolicy','no-referrer-when-downgrade');
+    var settled=false, shown=Date.now();
+    var slow=setTimeout(function(){ if(!settled) loader.classList.add('slow'); },14000);
+    f.onload=function(){
+      settled=true; clearTimeout(slow);
+      var wait=Math.max(0, 900-(Date.now()-shown));
+      setTimeout(function(){
+        loader.classList.add('gone');
+        setTimeout(function(){ loader.hidden=true; },500);
+      }, wait);
+    };
+    document.body.appendChild(f);
+    if('serviceWorker' in navigator){
+      try{ navigator.serviceWorker.register('sw.js').catch(function(){}); }catch(e){}
+    }
+  }
+
+  function setup(err){
+    loader.hidden=true;
+    app.innerHTML=
+      '<div id="setup"><div class="in">'+
+      '<h1><b>IRON</b>LOG</h1>'+
+      '<p>One-time setup. Paste your Apps Script web app URL — the same one that already works in your browser.</p>'+
+      '<label for="u">Web app /exec URL</label>'+
+      '<input id="u" placeholder="https://script.google.com/macros/s/…/exec" '+
+      'autocapitalize="off" autocorrect="off" spellcheck="false">'+
+      '<button id="go">Launch</button>'+
+      '<div class="err">'+(err||'')+'</div>'+
+      '<div class="muted">Stored on this device only. No token needed — '+
+      'the app signs in with your Google account, exactly as it does in the browser.</div>'+
+      '</div></div>';
+    var i=document.getElementById('u');
+    if(url) i.value=url;
+    document.getElementById('go').onclick=function(){
+      var v=i.value.trim();
+      if(!/^https:\/\/script\.google\.com\/macros\/(u\/\d+\/)?s\/.+\/exec/.test(v)){
+        document.querySelector('.err').textContent='That should end in /exec — copy it from Manage deployments.';
+        return;
+      }
+      try{ localStorage.setItem(LS,v); }catch(e){}
+      launch(v);
+    };
+  }
+
+  if(location.search.indexOf('setup')>=0) setup('');
+  else if(url) launch(url);
+  else setup('');
+})();
+</script>
+</body>
+</html>
